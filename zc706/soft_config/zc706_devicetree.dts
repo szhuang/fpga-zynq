@@ -369,6 +369,12 @@
 				reg = <0x100 0x100>;
 			} ;
 		} ;
+
+		efuse: efuse@f800d000 {
+			compatible = "xlnx,zynq-efuse";
+			reg = <0xf800d000 0x20>;
+		};
+
 		ps7_ttc_0: ps7-ttc@f8001000 {
 			clocks = <&clkc 6>;
 			compatible = "cdns,ttc";
