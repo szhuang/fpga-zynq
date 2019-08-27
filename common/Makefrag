@@ -129,12 +129,21 @@ arm-linux: arm-uboot # must first build uboot because we need tools
 	# compile kernel
 	git submodule update --init $(arm_linux_dir)
 	# no make clean included here since one copy of linux should work on all boards
-	cd $(arm_linux_dir) && make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- xilinx_zynq_defconfig
-	cd $(arm_linux_dir) && make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- -j$(JOBS)
-	# convert zImage to uImage
-	cd $(arm_linux_dir) && export PATH=$(uboot_dir)/tools:$$PATH && make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- UIMAGE_LOADADDR=0x8000 uImage
-	mkdir -p $(output_delivery)
-	cp $(arm_linux_dir)/arch/arm/boot/uImage $(output_delivery)/
+	if [ $(ARCH) == zynqmp ];then \
+	    cd $(arm_linux_dir) && make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- xilinx_zynqmp_defconfig ; \
+	    cd $(arm_linux_dir) && make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(JOBS) ; \
+	    # convert zImage to uImage
+	    cd $(arm_linux_dir) && export PATH=$(uboot_dir)/tools:$$PATH && make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- UIMAGE_LOADADDR=0x8000 uImage ; \
+	    mkdir -p $(output_delivery) ; \
+	    cp $(arm_linux_dir)/arch/arm/boot/uImage $(output_delivery)/ ; \
+	else \
+	    cd $(arm_linux_dir) && make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- xilinx_zynq_defconfig ; \
+	    cd $(arm_linux_dir) && make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- -j$(JOBS) ; \
+	    # convert zImage to uImage
+	    cd $(arm_linux_dir) && export PATH=$(uboot_dir)/tools:$$PATH && make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- UIMAGE_LOADADDR=0x8000 uImage ; \
+	    mkdir -p $(output_delivery) ; \
+	    cp $(arm_linux_dir)/arch/arm/boot/uImage $(output_delivery)/ ; \
+	fi;
 
 arm-uboot:
 	# compile board-compatible u-boot
@@ -145,13 +154,18 @@ arm-uboot:
 	    cp soft_config/boards.cfg $(uboot_dir)/ ; \
 	fi;
 	# actually build
-	cd $(uboot_dir) && make CROSS_COMPILE=arm-linux-gnueabihf- zynq_$(UBOOT_CONFIG)_config
-	cd $(uboot_dir) && make CROSS_COMPILE=arm-linux-gnueabihf- -j$(JOBS)
+	if [ $(ARCH) == zynqmp ];then \
+	    cd $(uboot_dir) && make CROSS_COMPILE=aarch64-linux-gnu- xilinx_zynqmp_$(UBOOT_CONFIG)_config ; \
+	    cd $(uboot_dir) && make CROSS_COMPILE=aarch64-linux-gnu- -j$(JOBS) ; \
+	else \
+	    cd $(uboot_dir) && make CROSS_COMPILE=arm-linux-gnueabihf- zynq_$(UBOOT_CONFIG)_config ; \
+	cd $(uboot_dir) && make CROSS_COMPILE=arm-linux-gnueabihf- -j$(JOBS) ; \
+	fi;
 	mkdir -p $(soft_build_dir)
 	cp $(uboot_dir)/u-boot.elf $(soft_build_dir)/u-boot.elf
 
 arm-dtb:
-	export PATH=$(arm_linux_dir)/scripts/dtc:$$PATH && dtc -I dts -O dtb -o $(output_delivery)/devicetree.dtb soft_config/$(BOARD)_devicetree.dts
+	export PATH=$(arm_linux_dir)/scrits/dtc:$$PATH && dtc -I dts -O dtb -o $(output_delivery)/devicetree.dtb soft_config/$(BOARD)_devicetree.dts
 
 
 
@@ -215,11 +229,12 @@ fesvr-hdrs = \
 
 fesvr-lib = $(common_build)/libfesvr.so
 
-CXX_FPGA      = arm-linux-gnueabihf-g++
+#CXX_FPGA      = arm-linux-gnueabi-g++
+CXX_FPGA      = aarch64-linux-gnu-g++
 CXXFLAGS_FPGA = -O2 -std=c++11 -Wall -L$(common_build) -lfesvr \
                 -Wl,-rpath,/usr/local/lib \
 		-I $(common)/csrc -I $(testchipip)/csrc \
-		-I $(ROCKET_DIR)/riscv-tools/riscv-fesvr/ \
+		-I ~/repo/riscv-isa-sim/ \
 		-Wl,-rpath,/usr/local/lib \
 
 $(fesvr-lib):
@@ -230,7 +245,7 @@ $(fesvr-lib):
 	make libfesvr.so
 
 $(common_build)/$(fesvr-main): $(fesvr-lib) $(fesvr-srcs) $(fesvr-hdrs)
-	$(CXX_FPGA) $(CXXFLAGS_FPGA) -o $(common_build)/$(fesvr-main) $(fesvr-srcs)
+	$(CXX_FPGA) $(CXXFLAGS_FPGA) -g -o $(common_build)/$(fesvr-main) $(fesvr-srcs)
 
 fesvr-zynq: $(common_build)/$(fesvr-main)
 

@@ -5,7 +5,8 @@
 #include <fcntl.h>
 #include <assert.h>
 
-#define ZYNQ_BASE_PADDR 0x43C00000L
+//#define ZYNQ_BASE_PADDR 0x43C00000L
+#define ZYNQ_BASE_PADDR 0xA0000000L
 
 #define TSI_OUT_FIFO_DATA 0x00
 #define TSI_OUT_FIFO_COUNT 0x04
@@ -46,6 +47,7 @@ zynq_driver_t::zynq_driver_t(tsi_t *tsi, BlockDevice *bdev)
     // reset the target
     write(SYSTEM_RESET, 1);
     write(SYSTEM_RESET, 0);
+    printf("%s: %d\n", __func__, __LINE__);
 
     // set nsectors and max_request_length
     if (bdev == NULL) {
@@ -66,6 +68,7 @@ zynq_driver_t::~zynq_driver_t()
 uint32_t zynq_driver_t::read(int off)
 {
     volatile uint32_t *ptr = (volatile uint32_t *) (this->dev + off);
+ //   printf("r: %p, %u\n", (uint32_t*)(this->dev + off), *ptr);
     return *ptr;
 }
 
@@ -73,6 +76,7 @@ void zynq_driver_t::write(int off, uint32_t word)
 {
     volatile uint32_t *ptr = (volatile uint32_t *) (this->dev + off);
     *ptr = word;
+//    printf("w: %p, %u\n", (uint32_t*)(this->dev + off), *ptr);
 }
 
 struct blkdev_request zynq_driver_t::read_blkdev_request()
