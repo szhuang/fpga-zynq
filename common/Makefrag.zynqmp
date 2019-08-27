@@ -1,0 +1,41 @@
+# This file is sourced by all ZynqMP boards' subdirectory
+
+TOP_MODULE_PROJECT ?= zynqmp
+CONFIG ?= ZynqConfig
+HOST = aarch64-linux-gnueabi
+
+# Platform software generation
+# ------------------------------------------------------------------------------
+arm_linux_dir = $(base_dir)/common/linux-xlnx
+uboot_dir = $(base_dir)/common/u-boot-xlnx
+soft_build_dir = soft_build
+
+arm-linux: arm-uboot # must first build uboot because we need tools
+	# compile kernel
+	git submodule update --init $(arm_linux_dir)
+	# no make clean included here since one copy of linux should work on all boards
+	cd $(arm_linux_dir) && make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnueabi- xilinx_zynqmp_defconfig
+	cd $(arm_linux_dir) && make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnueabi- -j$(JOBS)
+	mkdir -p $(output_delivery)
+	cp $(arm_linux_dir)/arch/arm/boot/Image $(output_delivery)/
+
+arm-uboot:
+	# compile board-compatible u-boot
+	git submodule update --init $(uboot_dir)
+	# copy relevant configuration files
+	if [ -a soft_config/boards.cfg ] ; \
+	then \
+	    cp soft_config/boards.cfg $(uboot_dir)/ ; \
+	fi;
+	# actually build
+	cd $(uboot_dir) && make CROSS_COMPILE=aarch64-linux-gnueabi- xilinx_zynqmp_$(UBOOT_CONFIG)_config
+	cd $(uboot_dir) && make CROSS_COMPILE=aarch64-linux-gnueabi- -j$(JOBS)
+	mkdir -p $(soft_build_dir)
+	cp $(uboot_dir)/u-boot.elf $(soft_build_dir)/u-boot.elf
+
+arm-dtb:
+	export PATH=$(arm_linux_dir)/scripts/dtc:$$PATH && dtc -I dts -O dtb -o $(output_delivery)/devicetree.dtb soft_config/$(BOARD)_devicetree.dts
+
+.PHONY: fetch-images load_card ramdisk-open ramdisk-close
+
+include ../common/Makefrag
